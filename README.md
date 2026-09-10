@@ -8,7 +8,12 @@ a delivery is clear to hand to a customer.
 Stdlib only, single file, no dependencies.
 
 ```
+# by path
 python delivery_gate.py ORDER.json --delivery-dir DIR
+
+# or by order id / stem, searching conventional layouts
+python delivery_gate.py fvr-20260831-cronlive01 --search-dirs orders,incoming_orders \
+    --deliveries deliveries
 ```
 
 ## Why this exists
@@ -86,6 +91,7 @@ producer's self-report is not evidence.**
 |---|---|
 | `--delivery-dir DIR` | where the delivery lives (manifest optional when given) |
 | `--deliveries DIR` | parent dir for the default `deliveries/<order_id>` layout |
+| `--search-dirs DIRS` | comma-separated dirs to search when the first argument is an order id/stem rather than a path |
 | `--stem STEM` | restrict CSV discovery to one export when the dir holds several orders |
 | `--niches FILE` | JSON map of `niche -> [directory category slugs]` to extend the built-in map |
 | `--json FILE` | write a machine-readable report (`passed`, `failures`, `warnings`, `facts`) |
@@ -93,6 +99,16 @@ producer's self-report is not evidence.**
 Both flat orders (`order_id`, `niche`, `location`, `target_records`, `fields`) and
 nested orders (`{client, scrape{category,city,state,max_companies}, deliverable{stem}}`)
 are understood.
+
+## Used in production
+
+This repo is the single source of truth for the check, not a copy of it: two scheduled
+fulfilment paths (a 15-minute order watcher and a 02:00 queue job) invoke
+`delivery_gate.py` directly by absolute path. Before the wiring change each path kept its
+own copy of the file and they had already drifted — one accepted an order id, the other
+did not. Parity is now asserted by running the same real deliveries through both callers
+and comparing verdicts, and a missing gate is a loud failure (`VERIFY: skipped (gate not
+found ...)`) rather than a silent pass.
 
 ## Design notes
 

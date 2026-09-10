@@ -117,6 +117,37 @@ class Report:
         return "\n".join(rows + [f"  · {k}: {v}" for k, v in self.facts.items()])
 
 
+def find_order(arg: str, search_dirs: str = "") -> Path | None:
+    """Accept an order PATH, or an order ID/stem to search for.
+
+    Searched dirs come from --search-dirs (comma or ':' separated) and, failing
+    that, the conventional local layouts. Deliberately portable: no absolute
+    machine paths, so this file stays publishable.
+    """
+    p = Path(arg)
+    if p.is_file():
+        return p
+    if search_dirs:
+        dirs = [Path(d.strip()) for d in search_dirs.replace(":", ",").split(",") if d.strip()]
+    else:
+        dirs = [Path("orders"), Path("incoming_orders"),
+                Path("incoming_orders/.processed"), Path("deliveries"), Path("output")]
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.json")):
+            if arg in f.stem:
+                return f
+            try:
+                o = json.loads(f.read_text(encoding="utf-8-sig"))
+                ident = str(o.get("order_id") or (o.get("deliverable") or {}).get("stem") or "")
+                if ident == arg:
+                    return f
+            except Exception:
+                continue
+    return None
+
+
 def csv_in(deliv_dir: Path, stem: str) -> Path | None:
     """Newest CSV, restricted to `stem` when one is given (see DESIGN NOTES)."""
     cands = list(deliv_dir.glob(f"{stem}*.csv")) if stem else list(deliv_dir.glob("*.csv"))
@@ -125,7 +156,10 @@ def csv_in(deliv_dir: Path, stem: str) -> Path | None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Verify a data delivery against its order.")
-    ap.add_argument("order", help="order JSON path")
+    ap.add_argument("order", help="order JSON path, or an order id/stem to search for")
+    ap.add_argument("--search-dirs", default="",
+                    help="comma-separated dirs searched when `order` is an id, not a path "
+                         "(default: orders/, incoming_orders/, deliveries/, output/)")
     ap.add_argument("--delivery-dir", default=None,
                     help="delivery directory; defaults to <cwd>/deliveries/<order_id>")
     ap.add_argument("--stem", default=None, help="export stem when the dir holds many orders")
@@ -134,9 +168,10 @@ def main(argv=None) -> int:
     ap.add_argument("--json", default=None, help="write a machine-readable report here")
     args = ap.parse_args(argv)
 
-    order_path = Path(args.order)
-    if not order_path.is_file():
-        print(f"ERROR: order file not found: {order_path}", file=sys.stderr)
+    order_path = find_order(args.order, args.search_dirs)
+    if order_path is None or not order_path.is_file():
+        print(f"ERROR: cannot locate order {args.order!r} (pass a path, or --search-dirs)",
+              file=sys.stderr)
         return 2
     try:
         order = json.loads(order_path.read_text(encoding="utf-8-sig"))
