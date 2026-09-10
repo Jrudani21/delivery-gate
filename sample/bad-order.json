@@ -1,0 +1,12 @@
+{
+  "order_id": "demo-bad",
+  "client": "Sample Client",
+  "package": "Basic",
+  "niche": "roofers",
+  "location": "Chicago, IL",
+  "target_records": 2,
+  "fields": ["business_name", "phone"],
+  "output_format": "csv",
+  "source": "hotfrog",
+  "notes": "Bundled FAILING example: the rows are wrong-niche for the order."
+}

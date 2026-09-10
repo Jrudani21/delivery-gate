@@ -1,0 +1,12 @@
+{
+  "order_id": "demo-001",
+  "client": "Sample Client",
+  "package": "Basic",
+  "niche": "roofers",
+  "location": "Chicago, IL",
+  "target_records": 2,
+  "fields": ["business_name", "phone", "address", "website"],
+  "output_format": "csv",
+  "source": "sample",
+  "notes": "Bundled example order. Sample data, so the gate passes with warnings."
+}

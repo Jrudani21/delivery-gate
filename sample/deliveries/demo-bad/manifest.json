@@ -1,0 +1,10 @@
+{
+  "order_id": "demo-bad",
+  "status": "ok",
+  "records_delivered": 2,
+  "deliverables": {
+    "csv": "deliveries/demo-bad/demo-bad_leads.csv"
+  },
+  "warnings": [],
+  "error": ""
+}
