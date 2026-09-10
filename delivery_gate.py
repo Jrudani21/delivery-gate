@@ -44,8 +44,11 @@ from pathlib import Path
 DEMO_PHONE = re.compile(r"555-01\d\d")
 DEMO_DOMAIN = re.compile(r"\b(example\.(com|org|net)|test\.com|acme\.com)\b", re.I)
 REDACTED = re.compile(r"[*•·]")
+# "source-link" is the branded-deliverable header for company_url (product/report.py
+# FIELDS_LABEL), so a branded CSV is checkable rather than merely unverifiable.
 NAME_COLS = {"business-name", "name", "company", "business"}
-URL_COLS = {"source-url", "company-url"}
+URL_COLS = {"source-url", "company-url", "source-link"}
+CAT_COLS = {"category", "categories", "niche"}
 
 # niche -> accepted directory category slugs. Data, not code: pass --niches to
 # extend without editing this file. Unmapped niche = warn, never a false FAIL.
@@ -91,7 +94,9 @@ def order_view(order: dict) -> dict:
     location = order.get("location") or (f"{city}, {state}" if city and state else city)
     return {
         "oid": str(order.get("order_id") or deliv.get("stem") or ""),
-        "niche": str(order.get("niche") or order.get("category") or scrape.get("category") or ""),
+        # yellowpages orders carry the niche in scrape.what, not scrape.category
+        "niche": str(order.get("niche") or order.get("category")
+                     or scrape.get("category") or scrape.get("what") or ""),
         "location": str(location or ""),
         "target": int(order.get("target_records") or 0),  # a promise; max_companies is not
         "stem": str(order.get("export_stem") or deliv.get("stem") or ""),
@@ -319,20 +324,34 @@ def main(argv=None) -> int:
         # as a mismatch.
         niche = v["niche"]
         wanted = set(slugs.get(niche.lower(), ()))
-        if (URL_COLS & cols) and (wanted or niche):
-            cats, unparsed = Counter(), 0
-            for r in rows:
-                url = getv(r, "source_url") or getv(r, "company_url")
-                segs = ([s for s in url.split("/company/", 1)[1].split("?")[0].split("#")[0].split("/") if s]
-                        if "/company/" in url else [])
-                if len(segs) < 4:
-                    unparsed += 1
-                    continue
-                cats[segs[-1].strip().lower()] += 1
+        has_url = bool(URL_COLS & cols)
+        has_cat = bool(CAT_COLS & cols)
+        if (has_url or has_cat) and (wanted or niche):
+            cats, unparsed, src = Counter(), 0, "source-url"
+            if has_url:
+                for r in rows:
+                    url = getv(r, "source_url") or getv(r, "company_url")
+                    segs = ([s for s in url.split("/company/", 1)[1].split("?")[0].split("#")[0].split("/") if s]
+                            if "/company/" in url else [])
+                    if len(segs) < 4:
+                        unparsed += 1
+                        continue
+                    cats[segs[-1].strip().lower()] += 1
+            # yellowpages deliveries carry no /company/ URL to parse, but they do carry
+            # the directory's own category column. That is equivalent evidence, so use
+            # it instead of declaring the whole delivery unverifiable.
+            if not cats and has_cat:
+                src, unparsed = "category-column", 0
+                for r in rows:
+                    c = norm(getv(r, "category") or getv(r, "categories")
+                             or getv(r, "niche"))
+                    if c:
+                        cats[c] += 1
             if unparsed:
                 rep.warn("SOURCE_URL_UNPARSED",
                          f"{unparsed}/{len(rows)} rows had no parsable /company/ category")
             if cats:
+                rep.facts["niche_source"] = src
                 rep.facts["source_categories"] = dict(cats.most_common(4))
                 detail = (f"niche {niche!r} expects {sorted(wanted)}; "
                           f"delivered {dict(cats.most_common(3))}")
@@ -350,8 +369,12 @@ def main(argv=None) -> int:
                                  f"only {hit}/{len(rows)} rows match the ordered niche — {detail}")
                     elif hit < len(rows) * 0.8:
                         rep.warn("NICHE_PARTIAL", f"only {hit}/{len(rows)} rows match — {detail}")
+            elif niche:
+                rep.warn("NICHE_UNCHECKABLE",
+                         "no parsable category in the source URL or category column")
         elif niche:
-            rep.warn("NICHE_UNCHECKABLE", "no source_url/company_url column — niche unverifiable")
+            rep.warn("NICHE_UNCHECKABLE",
+                     "no source_url/company_url/category column — niche unverifiable")
 
     return finish(rep, args.json, {"delivery_dir": str(deliv)})
 
