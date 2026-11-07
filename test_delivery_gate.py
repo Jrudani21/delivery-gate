@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Janak Rudani
+# SPDX-License-Identifier: MIT
+# Provenance: Jrudani21/delivery-gate/test_delivery_gate.py a83a6f93b685de59
 """Self-check for delivery_gate.py — no framework, no fixtures directory.
 
     python test_delivery_gate.py      # exit 0 = every case behaved

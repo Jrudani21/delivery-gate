@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Janak Rudani
+# SPDX-License-Identifier: MIT
+# Provenance: Jrudani21/delivery-gate/delivery_gate.py 2024e115fe69233c
 """delivery-gate — check a data delivery against the order that was paid for.
 
 WHY THIS EXISTS
